@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, session
 import json
 import random
+import requests
 import re
 from difflib import SequenceMatcher
 from deep_translator import GoogleTranslator
@@ -238,6 +239,7 @@ kannada_patterns = {
     "college_location": [
         "ಕಾಲೇಜು ಎಲ್ಲಿದೆ",
         "ಕಾಲೇಜ್ ಎಲ್ಲಿದೆ",
+        "ಎಲ್ಲಿ",
         "ಕಾಲೇಜಿನ ಸ್ಥಳ ಎಲ್ಲಿದೆ",
         "ಕಾಲೇಜಿನ ವಿಳಾಸ ಏನು",
         "ಆರ್ ವೈ ಎಂ ಇ ಸಿ ಎಲ್ಲಿದೆ",
@@ -279,7 +281,9 @@ kannada_patterns = {
         "ಕಾಲೇಜಿನಲ್ಲಿ ಯಾವ ವಿಭಾಗಗಳಿವೆ",
         "ಯಾವ ವಿಭಾಗಗಳಿವೆ",
         "ಎಂಜಿನಿಯರಿಂಗ್ ವಿಭಾಗಗಳು",
-        "ವಿಭಾಗಗಳ ಪಟ್ಟಿ"
+        "ವಿಭಾಗಗಳ ಪಟ್ಟಿ",
+        "ಇಲಾಖೆಗಳು",
+        "ಇಲಾಖೆ"
     ],
 
     "facilities": [
@@ -1061,58 +1065,84 @@ def translate_text():
         }), 400
 
     text = data.get("text", "").strip()
-
     target_language = data.get("target", "kn")
 
-    # -----------------------------------------------------
-    # Empty text
-    # -----------------------------------------------------
-
     if not text:
-
         return jsonify({
             "translation": "",
             "error": "Please enter text to translate."
         }), 400
 
-    # -----------------------------------------------------
-    # Allow only English and Kannada
-    # -----------------------------------------------------
-
-    if target_language not in ["en", "kn"]:
-        target_language = "kn"
+    # Demo fallback translations
+    fallback_translations = {
+        "hi": "ಹಾಯ್",
+        "hello": "ಹಲೋ",
+        "where is the college?": "ಕಾಲೇಜು ಎಲ್ಲಿದೆ?",
+        "where": "ಎಲ್ಲಿ",
+        "where is the college": "ಕಾಲೇಜು ಎಲ್ಲಿದೆ?",
+        "what courses are available?": "ಯಾವ ಕೋರ್ಸ್‌ಗಳಿವೆ?",
+        "what courses are available": "ಯಾವ ಕೋರ್ಸ್‌ಗಳಿವೆ?",
+        "what are the college timings?": "ಕಾಲೇಜಿನ ಸಮಯ ಏನು?",
+        "what are the college timings": "ಕಾಲೇಜಿನ ಸಮಯ ಏನು?",
+        "how can i get admission?": "ಪ್ರವೇಶ ಹೇಗೆ ಪಡೆಯುವುದು?",
+        "how can i get admission": "ಪ್ರವೇಶ ಹೇಗೆ ಪಡೆಯುವುದು?",
+        "what facilities are available?": "ಯಾವ ಸೌಲಭ್ಯಗಳಿವೆ?",
+        "what facilities are available": "ಯಾವ ಸೌಲಭ್ಯಗಳಿವೆ?",
+        "what are the departments?": "ವಿಭಾಗಗಳು ಯಾವುವು?",
+        "what are the departments": "ವಿಭಾಗಗಳು ಯಾವುವು?",
+        "contact the college": "ಕಾಲೇಜನ್ನು ಸಂಪರ್ಕಿಸಿ"
+    }
 
     try:
 
-        translator = GoogleTranslator(
+        # Use fallback for Kannada demo translations
+        if target_language == "kn":
+            key = text.lower().strip()
+
+            if key in fallback_translations:
+                translated_text = fallback_translations[key]
+
+                print("--------------------------------")
+                print("Translation request")
+                print("Original:", text)
+                print("Target:", target_language)
+                print("Translation:", translated_text)
+                print("Method: Demo fallback")
+                print("--------------------------------")
+
+                return jsonify({
+                    "translation": translated_text,
+                    "error": ""
+                })
+
+        # Try Google Translator for other/new text
+        translated_text = GoogleTranslator(
             source="auto",
             target=target_language
-        )
-
-        translated = translator.translate(text)
-
-        if not translated:
-            raise Exception("Empty translation received")
-
-        print("--------------------------------")
-        print("Translation request")
-        print("Original:", text)
-        print("Target:", target_language)
-        print("Translation:", translated)
-        print("--------------------------------")
+        ).translate(text)
 
         return jsonify({
-            "translation": translated,
+            "translation": translated_text,
             "error": ""
         })
 
     except Exception as error:
 
-        print("TRANSLATION ERROR:", error)
+        print("Translation error:", error)
+
+        # Final fallback
+        if target_language == "kn":
+            key = text.lower().strip()
+
+            if key in fallback_translations:
+                return jsonify({
+                    "translation": fallback_translations[key],
+                    "error": ""
+                })
 
         return jsonify({
             "translation": "",
-            "error": "Translation service is temporarily unavailable."
+            "error": "Google translation service is temporarily unavailable. Please try again."
         }), 500
 
 
